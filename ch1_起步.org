@@ -1,0 +1,270 @@
+小例子：在一条直线上，随机采样100个数据点，然后利用TensorFlow实现线性拟合。
+
+#+begin_src Python
+import tensorflow as tf
+import numpy as np
+
+# Create 100 phony x, y data points in NumPy, y = x * 0.1 + 0.3
+x_data = np.random.rand(100).astype("float32")
+y_data = x_data * 0.1 + 0.3
+
+# Try to find values for W and b so that y_data = W * x_data + b
+W = tf.Variable(tf.random_uniform([1], −1.0, 1.0))
+b = tf.Variable(tf.zeros([1]))
+y = W * x_data + b
+
+# Minimize the mean squared errors.
+loss = tf.reduce_mean(tf.square(y − y_data))
+optimizer = tf.train.GradientDescentOptimizer(0.5)
+train = optimizer.minimize(loss)
+
+# Before starting , initialize the variables. We will 'run' this first.
+init = tf.initialize_all_variables()
+
+# Launch the graph.
+sess = tf.Session()
+sess.run(init)
+
+# Fit the line.
+# the best fit would be W: [0.1], b: [0.3]
+for step in xrange(201):
+      sess.run(train)
+      if step % 20 == 0:
+            print(step, sess.run(W), sess.run(b))
+#+end_src
+
+* 使用基础
+
+使用 TensorFlow 之前，你需要了解关于 TensorFlow 的以下基础知识:
+- 使用图 (graphs) 来表示计算.
+- 在会话 (Session) 中执行图.
+- 使用张量 (tensors) 来代表数据.
+- 通过变量 (Variables) 维护状态.
+- 使用供给 (feeds) 和取回 (fetches) 将数据传入或传出任何操作.
+
+TensorFlow 是一个用图 (graphs) 来表示计算过程，图中的节点被称为 op(operation的缩写)。
+一个 op 对零或多个张量 (tensors) 执行计算，并产生零或多个张量。
+张量是一个按类型划分的多维数组。
+
+TensorFlow 的图是一种对计算的抽象描述。
+在计算开始前，必须在 会话(Session()) 启动图。
+会话将图的 op 分发到如 CPU 或 GPU 之类的 设备(Devices()) 上，同时提供执行 op 的方法。
+这些方法执行后，将产生的 张量(tensor) 返回。
+在 Python 中, 将返回numpy的ndarray对象; 在 C 和 C++ 中, 将返回tensorflow::Tensor实例。
+
+
+** 计算图
+通常, TensorFlow 编程可按两个阶段组织起来: 构建阶段和执行阶段;
+前者用于组织计算图, 后者利用 session 中执行计算图中的 op 操作。
+
+
+*** 构建计算图
+TensorFlow Python 库有一个可被 op 构造函数加入计算结点的默认图 (default graph)。
+对大多数应用来说,这个默认图已经足够用了。
+
+#+begin_src Python
+import tensorflow as tf
+
+# Create a Constant op that produces a 1x2 matrix.
+# The op is added as a node to the default graph.
+matrix1 = tf.constant([ [3., 3.] ])
+
+# Create another Constant that produces a 2x1 matrix.
+matrix2 = tf.constant([[2.],[2.]])
+
+# Create a Matmul op that takes 'matrix1' and 'matrix2' as inputs.
+# The returned value, 'product', represents the result of the matrix multiplication.
+product = tf.matmul(matrix1 , matrix2)
+#+end_src
+
+默认图现在拥有三个节点, 两个constant() op, 一个matmul() op。
+为了真正进行矩阵乘法运算, 得到乘法结果, 你必须在一个会话 (session) 中载入这个图。
+
+*** 在会话中载入图
+为了载入之前所构建的图, 必须先创建一个会话对象 (Session object)。
+会话构建器在未指明参数时会载入默认图。
+
+#+begin_src Python
+# Launch the default graph.
+sess = tf.Session()
+
+# To run the matmul op we call the session 'run()' method, passing 'product'
+# which represents the output of the matmul op. This indicates to the call
+# that we want to get the output of the matmul op back.
+#
+# All inputs needed by the op are run automatically by the session.
+# They typically are run in parallel.
+#
+# The call 'run(product)' thus causes the execution of threes ops in the graph:
+# the two constants and matmul.
+#
+# The output of the op is returned in 'result' as a numpy 'ndarray' object.
+result = sess.run(product)
+print(result)
+# ==> [ [ 12.] ]
+
+# Close the Session when we're done.
+sess.close()
+#+end_src
+
+调用 run 方法执行运算；传入的参数 product 代表了要计算的对象是哪个op。
+执行结果保存在result中，这将是一个np的ndarray对象。
+
+会话在完成后必须关闭以释放资源。
+也可以使用"with"句块开始一个会话, 这样会话将在"with"句块结束时自动关闭。
+
+#+begin_src Python
+with tf.Session() as sess:
+      result = sess.run([product])
+      print(result)
+#+end_src
+
+
+TensorFlow 事实上通过一个“翻译”过程。
+将定义的图转化为不同的可用计算资源间实现分布计算的操作, 如 CPU 或是显卡 GPU。
+通常不需要用户指定具体使用的 CPU 或 GPU, TensorFlow 能自动检测并尽可能的充分利用找到的第一个 GPU 进行运算。
+
+如果你的设备上有不止一个 GPU, 你可以使用with...Device语句，明确指定op的运算设备。
+
+#+begin_src Python
+with tf.Session() as sess:
+      with tf.device("/gpu:1"):
+            matrix1 = tf.constant([ [3., 3.] ])
+            matrix2 = tf.constant([[2.], [2.]])
+            product = tf.matmul(matrix1 , matrix2)
+            ...
+#+end_src
+
+使用字符串指定设备, 目前支持的设备包括:
+- "/cpu:0": 计算机的 CPU;
+- "/gpu:0": 计算机的第一个 GPU, 如果可用;
+- "/gpu:1": 计算机的第二个 GPU, 以此类推。
+
+*** 交互式使用
+考虑到如IPython这样的交互式 Python 环境的易用，
+- 可以使用 InteractiveSession 代替Session类，
+- 使用 Tensor.eval()和 Operation.run() 方法代替 Session.run()。
+
+#+begin_src Python
+# Enter an interactive TensorFlow Session.
+import tensorflow as tf
+sess = tf.InteractiveSession()
+
+x = tf.Variable([1.0, 2.0])
+a = tf.constant([3.0, 3.0])
+
+# Initialize 'x' using the run() method of its initializer op.
+x.initializer.run()
+
+# Add an op to subtract 'a' from 'x'. Run it and print the result
+sub = tf.sub(x, a)
+print(sub.eval())
+# ==> [−2. −1.]
+
+# Close the Session when we're done.
+sess.close()
+#+end_src
+
+
+** 张量 Tensor
+TensorFlow 程序使用 tensor 数据结构来代表所有的数据。
+计算图中, 操作间传递的数据都是 tensor。
+你可以把 TensorFlow 的张量看作是一个 n 维的数组或列表。
+一个 tensor 包含一个静态类型 rank, 和一个 shape。
+
+
+** 变量 Variable
+变量维持了图执行过程中的状态信息。
+
+#+begin_src Python
+# 创建一个变量, 初始化为标量 0.
+state = tf.Variable(0, name="counter")
+
+# 创建一个 op, 其作用是使 state 增加 1
+one = tf.constant(1)
+new_value = tf.add(state, one)
+update = tf.assign(state, new_value)
+
+# 启动图后, 变量必须先经过`初始化` (init) op 初始化,
+# 首先必须增加一个`初始化` op 到图中!!!
+init_op = tf.initialize_all_variables()
+
+# 启动图, 运行 op
+with tf.Session() as sess:
+  # 运行 'init' op
+  sess.run(init_op)
+  # 打印 'state' 的初始值
+  print(sess.run(state))
+  #
+  # 运行 op, 更新 'state', 并打印 'state'
+  for _ in range(3):
+    sess.run(update)
+    print(sess.run(state))
+
+# 输出:
+# 0
+# 1
+# 2
+# 3
+#+end_src
+
+通常会将一个统计模型中的参数表示为一组变量。
+例如, 你可以将一个神经网络的权重作为一个tensor，存储在一个变量中。
+在训练过程中, 通过重复运行训练图, 更新这个tensor。
+
+** 取回 fetch
+可以在 Session.run() 执行图时, 传入一些 tensor, 让这些tensor帮你取回结果。
+需要获取的多个 tensor 值，可以从 op 的一次运行中获得（而不是逐个运行获取）。
+
+#+begin_src Python
+input1 = tf.constant(3.0)
+input2 = tf.constant(2.0)
+input3 = tf.constant(5.0)
+intermed = tf.add(input2, input3)
+mul = tf.mul(input1, intermed)
+
+with tf.Session() as sess:
+  result = sess.run([mul, intermed])
+  print(result)
+
+# 输出:
+# [array([ 21.], dtype=float32), array([ 7.], dtype=float32)]
+#+end_src
+
+** 供给 feed
+上述示例在计算图中引入了 tensor, 以常量(Constants)或变量(Variables)的形式存储。
+TensorFlow 还提 供给 (feed) 机制, 该机制可临时替代图中的任意操作中的 tensor。
+可以对图中任何操作提交补丁, 直接插入一个 tensor.
+
+feed 使用一个 tensor 值临时替换一个操作的输出结果。
+你可以提供 feed 数据作为 run() 调用的参数。
+feed 只在调用它的方法内有效, 方法结束时 feed 就会消失。
+
+最常见的用例是，使用tf.placeholder()创建占位符，这些占位符将用"feed"填充。
+
+#+begin_src Python
+input1 = tf.placeholder(tf.float32)
+input2 = tf.placeholder(tf.float32)
+output = tf.mul(input1, input2)
+
+with tf.Session() as sess:
+  print sess.run([output], feed_dict={input1:[7.], input2:[2.]})
+
+# 输出:
+# [array([ 14.], dtype=float32)]
+#+end_src
+
+****** · <=>---<=> · <=>---<=> · <=>---<=> · <=>---<=> · <=>---<=> · <=>---<=>
+
+** 重要概念回顾
+- 计算图
+- 图结点 op
+- 张量
+- 会话
+
+- 常量
+- 变量
+- 占位符
+
+- feed
+- fetch
