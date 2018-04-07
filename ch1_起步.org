@@ -110,7 +110,7 @@ print(result)
 sess.close()
 #+end_src
 
-调用 run 方法执行运算；传入的参数 product 代表了要计算的对象是哪个op.
+调用 run 方法执行运算; 传入的参数 product 代表了要计算的对象是哪个op.
 执行结果保存在result中, 这将是一个np的ndarray对象.
 
 会话在完成后必须关闭以释放资源.
@@ -122,8 +122,7 @@ with tf.Session() as sess:
       print(result)
 #+end_src
 
-TensorFlow 事实上通过一个"翻译"过程.
-将定义的图转化为不同的可用计算资源间实现分布计算的操作, 如 CPU 或是显卡 GPU.
+TensorFlow 事实上通过一个"翻译"过程, 将定义的图转化为不同的可用计算资源间实现分布计算的操作, 如 CPU 或是显卡 GPU.
 通常不需要用户指定具体使用的 CPU 或 GPU, TensorFlow 能自动检测并尽可能的充分利用找到的第一个 GPU 进行运算.
 
 如果你的设备上有不止一个 GPU, 你可以使用with...Device语句, 明确指定op的运算设备.
@@ -173,6 +172,7 @@ sess.close()
 TensorFlow 程序使用 tensor 数据结构来代表所有的数据.
 计算图中, 操作间传递的数据都是 tensor.
 你可以把 TensorFlow 的张量看作是一个 n 维的数组或列表.
+
 一个 tensor 包含一个静态的rank, 和一个 shape.
 - rank为阶, 零阶为标量，一阶为向量，二阶为矩阵.
 - shape为形状, 用于刻画各阶的维数.
