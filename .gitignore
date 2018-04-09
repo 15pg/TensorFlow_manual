@@ -103,3 +103,6 @@ ENV/
 # MNIST data folder
 MNIST_data/
 MNIST-data/
+
+# Dolphin file manager temp files
+.directory
